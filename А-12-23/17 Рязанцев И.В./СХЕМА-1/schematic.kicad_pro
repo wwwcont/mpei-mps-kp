@@ -1,0 +1,26 @@
+{
+  "erc": {
+    "rule_severities": {
+      "lib_symbol_issues": "ignore",
+      "lib_symbol_mismatch": "ignore",
+      "footprint_link_issues": "ignore",
+      "net_not_bus_member": "ignore",
+      "missing_unit": "ignore",
+      "missing_input_pin": "ignore",
+      "missing_power_pin": "ignore"
+    }
+  },
+  "schematic": {
+    "page_layout_descr_file": "ramka.kicad_wks",
+    "drawing": {
+      "text_offset_ratio": 0.08,
+      "label_size_ratio": 0.25
+    },
+    "subpart_id_separator": 46,
+    "subpart_first_id": 49
+  },
+  "meta": {
+    "filename": "schematic.kicad_pro",
+    "version": 3
+  }
+}

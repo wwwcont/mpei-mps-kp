@@ -1,0 +1,4 @@
+ПЗ2-1 по СХЕМА-1
+workflow: КМ-3 программы и ПЗ2, запуск https://github.com/wwwcont/mpei-mps-kp/actions/runs/36875336276
+коммит: 6706f3f5162c6501a18e0cab4d43cc7cb0ed7030
+дата: 2026-10-01 14:19 UTC
