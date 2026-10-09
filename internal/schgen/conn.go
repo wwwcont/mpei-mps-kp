@@ -25,7 +25,7 @@ type ConnStyle struct {
 
 var (
 	ConnSignalPin = ConnStyle{NameHdr: "Сигнал", NumHdr: "Вывод"}               // принятая Ивана 2025
-	ConnNumNet    = ConnStyle{NameHdr: "Цепь", NumHdr: "№", NumFirst: true}     // Осипова 2025
+	ConnNumNet    = ConnStyle{NameHdr: "Цепь", NumHdr: "Конт.", NumFirst: true} // Осипова 2025 («№» — нет знака в шрифте листа, выходил квадрат)
 	ConnContNet   = ConnStyle{NameHdr: "Цепь", NumHdr: "Конт.", NumFirst: true} // методичка Прил. А, Visio-работы
 )
 

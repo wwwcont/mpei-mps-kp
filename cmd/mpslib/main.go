@@ -100,6 +100,12 @@ func run(dir, out string, dump bool) error {
 		if s.as == "GND" {
 			gostGND(sym)
 		}
+		gostPassive(sym, s.as)
+		if strings.HasPrefix(s.as, "FYS-") {
+			// буквы сегментов внутри рисунка индикатора (высота ~0,6 мм) на А3 сливаются с именами выводов A…DP
+			// (проверка листов 09.10.2026): рисунок «8.» остаётся, сегменты называют имена выводов
+			dropTexts(sym)
+		}
 		if dump {
 			fmt.Printf("== %s (%s:%s)\n", s.as, s.lib, s.name)
 			for _, p := range schgen.Pins(sym) {
@@ -262,4 +268,57 @@ func renameSym(sym *schgen.Node, old, nu string) {
 	for _, k := range sym.All("symbol") {
 		k.Kids[1] = schgen.Q(nu + strings.TrimPrefix(k.Arg(0), old))
 	}
+}
+
+// gostPassive — пропорции и линии по ГОСТ 2.728/2.755 (замечание Гольцова 08.10.2026): резистор 8×4 (здесь 5,08×2,54),
+// обкладки конденсатора тонкие, длина : зазор = 8 : 2; кнопка — ключ (наклонная черта с толкателем), без кружков.
+func gostPassive(sym *schgen.Node, as string) {
+	line := func(x0, y0, x1, y1 float64) *schgen.Node { return lineN(x0, y0, x1, y1) }
+	setBody := func(nodes ...*schgen.Node) {
+		for _, sub := range sym.All("symbol") {
+			if strings.HasSuffix(sub.Arg(0), "_0_1") {
+				sub.Remove(func(k *schgen.Node) bool { return graphics[k.Head()] })
+				sub.Kids = append(sub.Kids, nodes...)
+			}
+		}
+	}
+	pinLen := func(l float64) {
+		for _, sub := range sym.All("symbol") {
+			for _, pin := range sub.All("pin") {
+				pin.Find("length").Kids[1] = schgen.F(l)
+			}
+		}
+	}
+	switch as {
+	case "R":
+		setBody(rectN(-1.27, 2.54, 1.27, -2.54))
+	case "C":
+		setBody(line(-2.032, 0.508, 2.032, 0.508), line(-2.032, -0.508, 2.032, -0.508))
+		pinLen(3.302)
+	case "C_Polarized":
+		// «+» у положительной обкладки (вывод 1, сверху)
+		setBody(line(-2.032, 0.508, 2.032, 0.508), line(-2.032, -0.508, 2.032, -0.508),
+			line(-2.286, 1.524, -1.27, 1.524), line(-1.778, 2.032, -1.778, 1.016))
+		pinLen(3.302)
+	case "Crystal":
+		setBody(line(-1.905, -1.27, -1.905, 1.27), line(1.905, -1.27, 1.905, 1.27), rectN(-1.143, 2.54, 1.143, -2.54),
+			line(-2.54, 0, -1.905, 0), line(2.54, 0, 1.905, 0))
+	case "SW_Push":
+		// замыкающий контакт кнопки: подвижный контакт — наклонная черта от левого вывода, толкатель с площадкой сверху
+		setBody(line(-2.54, 0, 2.032, 1.524), line(2.032, 0, 2.54, 0),
+			line(0, 0.847, 0, 2.794), line(-0.762, 2.794, 0.762, 2.794))
+	}
+}
+
+// dropTexts убирает графические надписи из всех частей символа.
+func dropTexts(sym *schgen.Node) {
+	sym.Walk(func(n *schgen.Node) {
+		var keep []*schgen.Node
+		for _, k := range n.Kids {
+			if k.Head() != "text" {
+				keep = append(keep, k)
+			}
+		}
+		n.Kids = keep
+	})
 }

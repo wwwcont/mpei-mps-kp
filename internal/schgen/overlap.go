@@ -131,6 +131,7 @@ type olItem struct {
 	b     box
 	a, z  Pt   // для pin — отрезок вывода
 	field bool // обозначение/тип элемента — проверяется и против своего корпуса
+	at    *Pt  // точка привязки метки: свой провод (через неё проходящий) надпись не перечёркивает
 }
 
 // units — число частей символа (подсимволы NAME_u_s с u ≥ 1).
@@ -157,7 +158,7 @@ func Overlaps(src string) ([]string, error) {
 			libs[s.Arg(0)] = s
 		}
 	}
-	var items, pbodies []olItem
+	var items, pbodies, glines []olItem
 	var wires [][2]Pt
 	for _, w := range root.All("wire") {
 		p := w.Find("pts").All("xy")
@@ -249,8 +250,14 @@ func Overlaps(src string) ([]string, error) {
 					s, e := g.Find("start"), g.Find("end")
 					body = append(body, xform(pos, rot, s.Num(0), s.Num(1)), xform(pos, rot, e.Num(0), e.Num(1)))
 				case "polyline":
+					var pl []Pt
 					for _, xy := range g.Find("pts").All("xy") {
-						body = append(body, xform(pos, rot, xy.Num(0), xy.Num(1)))
+						p := xform(pos, rot, xy.Num(0), xy.Num(1))
+						body = append(body, p)
+						pl = append(pl, p)
+					}
+					for k := 0; k+1 < len(pl); k++ {
+						glines = append(glines, olItem{kind: "gline", owner: owner, a: pl[k], z: pl[k+1]})
 					}
 				case "circle":
 					c, r := g.Find("center"), g.Find("radius").Num(0)
@@ -331,8 +338,9 @@ func Overlaps(src string) ([]string, error) {
 		size, hj, vj, _ := effects(l)
 		at := l.Find("at")
 		// метка под 180°/270° KiCad хранит с выравниванием «right»: текст идёт от точки влево/вниз — как 0°/90° с этим выравниванием
-		items = append(items, olItem{kind: "text", owner: "метка " + l.Arg(0), what: fmt.Sprintf("метка %q", l.Arg(0)),
-			b: textBox(l.Arg(0), Pt{at.Num(0), at.Num(1)}, math.Mod(at.Num(2), 180), hj, vj, size)})
+		ap := Pt{at.Num(0), at.Num(1)}
+		items = append(items, olItem{kind: "text", owner: "метка " + l.Arg(0), what: fmt.Sprintf("метка %q", l.Arg(0)), at: &ap,
+			b: textBox(l.Arg(0), ap, math.Mod(at.Num(2), 180), hj, vj, size)})
 	}
 	for _, t := range root.All("text") {
 		size, hj, vj, _ := effects(t)
@@ -371,7 +379,8 @@ func Overlaps(src string) ([]string, error) {
 			}
 			switch {
 			case a.kind == "text" && b.kind == "text":
-				if a.b.shrink(tol).hit(b.b.shrink(tol)) {
+				// не слипаются: зазор ≥ 0,25 мм («49Y1stb» — номер линии вплотную к имени)
+				if a.b.shrink(-0.125).hit(b.b.shrink(-0.125)) {
 					add("%s (%s) наезжает на %s (%s)", a.what, a.owner, b.what, b.owner)
 				}
 			case a.kind == "text" && b.kind == "body", a.kind == "body" && b.kind == "text":
@@ -407,18 +416,22 @@ func Overlaps(src string) ([]string, error) {
 		// провода и шины: сквозь корпуса и надписи
 		if a.kind == "body" {
 			for _, w := range append(append([][2]Pt{}, wires...), buses...) {
-				if segHit(w[0], w[1], a.b.shrink(tol)) {
+				// и вплотную вдоль края: провод ближе 0,6 мм к чужому корпусу читается как «пересечение УГО» (замечание Михалина: DD3.1)
+				if segHit(w[0], w[1], a.b.shrink(-0.6)) {
 					add("провод/шина (%.2f,%.2f)–(%.2f,%.2f) проходит через корпус %s", w[0].X, w[0].Y, w[1].X, w[1].Y, a.owner)
 				}
 			}
 		}
 		if a.kind == "text" {
 			// метка стоит на своём проводе: нижние 0,3 мм прямоугольника не проверяем
-			tb := a.b.shrink(tol)
+			tb := a.b.shrink(-0.15) // надпись не вплотную к линиям (замечание Гольцова: «надписи налезают на линии»)
 			if strings.HasPrefix(a.owner, "метка ") {
-				tb.y1 -= 0.3
+				tb.y1 -= 0.5 // метка стоит на своём проводе
 			}
 			for _, w := range wires {
+				if a.at != nil && (a.at.eq(w[0]) || a.at.eq(w[1]) || onSegInner(w[0], w[1], *a.at)) {
+					continue // свой провод
+				}
 				if segHit(w[0], w[1], tb) {
 					add("%s (%s) перечёркнута проводом (%.2f,%.2f)–(%.2f,%.2f)", a.what, a.owner, w[0].X, w[0].Y, w[1].X, w[1].Y)
 				}
@@ -430,6 +443,49 @@ func Overlaps(src string) ([]string, error) {
 			}
 		}
 	}
+	// вход в шину: провода с двух сторон в одной точке шины выглядят как пересечение шины (замечание Гольцова: «A15–AD4 … пересекают её»)
+	type entry struct{ on, w Pt }
+	var ents []entry
+	for _, e := range root.All("bus_entry") {
+		at, sz := e.Find("at"), e.Find("size")
+		p0 := Pt{at.Num(0), at.Num(1)}
+		p1 := p0.Add(sz.Num(0), sz.Num(1))
+		onBus := func(p Pt) bool {
+			for _, b := range buses {
+				if p.eq(b[0]) || p.eq(b[1]) || onSegInner(b[0], b[1], p) {
+					return true
+				}
+			}
+			return false
+		}
+		switch {
+		case onBus(p0):
+			ents = append(ents, entry{p0, p1})
+		case onBus(p1):
+			ents = append(ents, entry{p1, p0})
+		}
+	}
+	for i := range ents {
+		for j := i + 1; j < len(ents); j++ {
+			a, b := ents[i], ents[j]
+			same := math.Abs(a.on.X-b.on.X) < 0.01 && math.Abs(a.on.Y-b.on.Y) < 1.0 || math.Abs(a.on.Y-b.on.Y) < 0.01 && math.Abs(a.on.X-b.on.X) < 1.0
+			opposite := (a.w.X-a.on.X)*(b.w.X-b.on.X) < 0 || (a.w.Y-a.on.Y)*(b.w.Y-b.on.Y) < 0
+			if same && opposite {
+				add("входы в шину с двух сторон напротив друг друга около (%.1f; %.1f) мм — выглядит как пересечение шины", a.on.X, a.on.Y)
+			}
+		}
+	}
+	// имя вывода не пересекает линии внутри своего корпуса (разделители полей ГОСТ-УГО; Гольцов: «MPU, RAM перечёркнуты»)
+	for _, it := range items {
+		if it.kind != "text" || !strings.HasPrefix(it.what, "имя вывода") && !strings.HasPrefix(it.what, "знак ") {
+			continue
+		}
+		for _, g := range glines {
+			if g.owner == it.owner && segHit(g.a, g.z, it.b.shrink(0.1)) {
+				add("%s (%s) пересекает линию внутри корпуса", it.what, it.owner)
+			}
+		}
+	}
 	// знак питания/земли не на чужом корпусе и не на выводе другого элемента
 	for _, p := range pbodies {
 		for _, it := range items {
@@ -438,6 +494,14 @@ func Overlaps(src string) ([]string, error) {
 				add("знак питания %s на корпусе %s около (%.1f; %.1f) мм", p.owner, it.owner, p.b.x0, p.b.y0)
 			case it.kind == "pin" && segHit(it.a, it.z, p.b.shrink(0.1)):
 				add("знак питания %s на выводе %s около (%.1f; %.1f) мм", p.owner, it.owner, p.b.x0, p.b.y0)
+			}
+		}
+	}
+	// надпись не на знаке питания/земли (подпись DD5.1 под землёй дешифратора — проверка листов 09.10.2026)
+	for _, p := range pbodies {
+		for _, it := range items {
+			if it.kind == "text" && it.owner != p.owner && it.b.shrink(0.1).hit(p.b) { // касание номера вывода у конца вывода — норма KiCad
+				add("%s (%s) на знаке питания около (%.1f; %.1f) мм", it.what, it.owner, p.b.x0, p.b.y0)
 			}
 		}
 	}

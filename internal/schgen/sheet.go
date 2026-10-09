@@ -15,28 +15,29 @@ const labelFont = 1.1
 
 // Sheet — лист схемы, который собирается вызовами Sym/Wire/Label/...
 type Sheet struct {
-	lib     *Lib
-	used    map[string]*Node // lib_id → символ для lib_symbols
-	items   []*Node
-	wires   [][2]Pt
-	pinPts  []Pt
-	syms    []*Comp
-	seed    string
-	n       int
-	pwr     int
-	Title   TitleBlock
-	rootID  string
-	project string
-	Roles   map[string]*Comp // роль → элемент (заполняет построитель)
-	buses   [][2]Pt
-	entries [][2]Pt
-	perp    bool
-	A4      bool                   // лист А4 книжный (перечень элементов), иначе А3 альбомный
-	J       Jitter                 // «почерк» листа (jitter.go); нулевой — как Plain
-	Fixes   *Fixes                 // правки студента (fixes.go); nil — нет
-	FixErrs []string               // ошибки в правках (неизвестные обозначения и т.п.) — mpsgen падает с ними
-	NC      []Pt                   // выводы, свободные намеренно (NoConnect)
-	numCols map[string][][]colItem // столбцы нумерации (Renumber) — для проверки NumberingDoubts
+	LabelAtPin map[string]bool // имена, которые busMarks ставит у вывода, а не у шины (у шины место занято)
+	lib        *Lib
+	used       map[string]*Node // lib_id → символ для lib_symbols
+	items      []*Node
+	wires      [][2]Pt
+	pinPts     []Pt
+	syms       []*Comp
+	seed       string
+	n          int
+	pwr        int
+	Title      TitleBlock
+	rootID     string
+	project    string
+	Roles      map[string]*Comp // роль → элемент (заполняет построитель)
+	buses      [][2]Pt
+	entries    [][2]Pt
+	perp       bool
+	A4         bool                   // лист А4 книжный (перечень элементов), иначе А3 альбомный
+	J          Jitter                 // «почерк» листа (jitter.go); нулевой — как Plain
+	Fixes      *Fixes                 // правки студента (fixes.go); nil — нет
+	FixErrs    []string               // ошибки в правках (неизвестные обозначения и т.п.) — mpsgen падает с ними
+	NC         []Pt                   // выводы, свободные намеренно (NoConnect)
+	numCols    map[string][][]colItem // столбцы нумерации (Renumber) — для проверки NumberingDoubts
 }
 
 type TitleBlock struct {
@@ -217,7 +218,16 @@ func yn(b bool) string {
 // Power ставит символ питания (+5V / GND) в точку at.
 func (s *Sheet) Power(kind string, at Pt, rot int) *Comp {
 	s.pwr++
-	return s.Sym(kind, fmt.Sprintf("#PWR%02d", s.pwr), kind, at, SymOpt{Rot: rot, HideVal: kind == "GND"})
+	o := SymOpt{Rot: rot, HideVal: kind == "GND"}
+	// знак питания вбок: надпись за концом стрелки, а не на ней («+» прятался под стрелкой — проверка листов 09.10.2026),
+	// и над проводом, а не посередине: иначе она свисает в промежуток к соседнему ряду и задевает надчёркивание метки под ней
+	switch (rot%360 + 360) % 360 {
+	case 270: // стрелка вправо
+		o.ValAt, o.ValJust = ptr2(at.Add(3.302, -0.95)), "left"
+	case 90: // стрелка влево
+		o.ValAt, o.ValJust = ptr2(at.Add(-3.302, -0.95)), "right"
+	}
+	return s.Sym(kind, fmt.Sprintf("#PWR%02d", s.pwr), kind, at, o)
 }
 
 // Wire — ломаная из отрезков.
@@ -354,6 +364,7 @@ func (s *Sheet) emitBuses() {
 		}
 		s.entries[i] = [2]Pt{w, nb}
 	}
+	s.busMarks()
 	for _, b := range s.buses {
 		s.items = append(s.items, L("bus",
 			L("pts", L("xy", F(b[0].X), F(b[0].Y)), L("xy", F(b[1].X), F(b[1].Y))),
@@ -615,3 +626,5 @@ func (s *Sheet) shift() {
 	}
 	s.J.ShiftX, s.J.ShiftY = 0, 0
 }
+
+func ptr2(p Pt) *Pt { return &p }

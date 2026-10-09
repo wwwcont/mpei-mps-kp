@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"mpskp/internal/schgen"
@@ -13,16 +14,19 @@ type gostIC struct {
 	base, title string
 	field       float64           // ширина полей меток слева/справа (0 — без полей)
 	rename      map[string]string // метки выводов
+	widen       float64           // раздвинуть выводы слева/справа (основное поле шире надписи — замечание Гольцова: «MPU, RAM перечёркнуты»)
 }
 
 var gostICs = []gostIC{
-	{"74HC573", "RG", 5.08, map[string]string{"Load": "C", "OE": "EZ"}},
-	{"74HC173", "RG", 5.08, map[string]string{"Cp": "C", "Mr": "R", "Oe1": "EZ1", "Oe2": "EZ2"}},
-	{"74HC244", "BUF", 5.08, map[string]string{"1OE": "EZ1", "2OE": "EZ2"}},
+	{"74HC573", "RG", 5.08, map[string]string{"Load": "C", "OE": "EZ"}, 0},
+	{"74HC173", "RG", 5.08, map[string]string{"Cp": "C", "Mr": "R", "Oe1": "EZ1", "Oe2": "EZ2"}, 0},
+	{"74HC244", "BUF", 5.08, map[string]string{"1OE": "EZ1", "2OE": "EZ2"}, 0},
 	{"74HC138", "DC", 3.81, map[string]string{"A0": "1", "A1": "2", "A2": "4", "~{E0}": "&", "~{E1}": "", "E2": "",
-		"~{Y0}": "0", "~{Y1}": "1", "~{Y2}": "2", "~{Y3}": "3", "~{Y4}": "4", "~{Y5}": "5", "~{Y6}": "6", "~{Y7}": "7"}},
-	{"IDT7005", "RAM", 7.62, nil},
-	{"AT89S53", "MPU", 10.16, map[string]string{"~{EA}/VPP": "~{EA}"}},
+		"~{Y0}": "0", "~{Y1}": "1", "~{Y2}": "2", "~{Y3}": "3", "~{Y4}": "4", "~{Y5}": "5", "~{Y6}": "6", "~{Y7}": "7"}, 0},
+	// MPU, RAM: подписи выводов короче (P0.0/AD0 → AD0, A0L → A0 — сторона порта видна по положению вывода), поля меток уже,
+	// основное поле шире надписи (замечание Гольцова: «MPU, RAM перечёркнуты»)
+	{"IDT7005", "RAM", 6.35, idtNames(), 0},
+	{"AT89S53", "MPU", 7.62, mcuNames(), 0},
 }
 
 type gostGate struct {
@@ -101,13 +105,41 @@ func gostifyIC(sym *schgen.Node, g gostIC) {
 	}
 	stripGraphics(sym)
 	const pl = 2.54
+	if g.widen > 0 {
+		for _, sub := range sym.All("symbol") {
+			for _, pin := range sub.All("pin") {
+				at := pin.Find("at")
+				switch at.Num(0) {
+				case minX:
+					at.Kids[1] = schgen.F(minX - g.widen)
+				case maxX:
+					at.Kids[1] = schgen.F(maxX + g.widen)
+				}
+			}
+		}
+		minX, maxX = minX-g.widen, maxX+g.widen
+	}
 	left, right := minX+pl, maxX-pl
 	top, bot := maxY-pl, minY+pl // выводы питания сверху/снизу — тоже укорачиваем до 2,54
 	for _, sub := range sym.All("symbol") {
 		for _, pin := range sub.All("pin") {
 			pin.Find("length").Kids[1] = schgen.F(pl)
 			if nm := pin.Find("name"); nm != nil {
-				if r, ok := g.rename[nm.Arg(0)]; ok {
+				orig := nm.Arg(0)
+				// активный ноль — кружком инверсии на выводе, без надчёркивания в имени (ГОСТ 2.743; единообразно для всех УГО)
+				// только если надчёркнуто всё имя (R/~{W}, M/~{S} — частичное: остаётся надчёркивание, кружка нет)
+				core := orig
+				if strings.HasSuffix(core, "}L") || strings.HasSuffix(core, "}R") { // IDT7005: ~{CE}L
+					core = core[:len(core)-1]
+				}
+				if strings.HasPrefix(core, "~{") && strings.HasSuffix(core, "}") && strings.Count(core, "~{") == 1 && pin.Arg(0) != "power_in" {
+					pin.Kids[2] = schgen.A("inverted")
+					nm.Kids[1] = schgen.Q(strings.NewReplacer("~{", "", "}", "").Replace(orig))
+				}
+				if r, ok := g.rename[orig]; ok {
+					if pin.Arg(0) == "inverted" || pin.Kids[2].Atom == "inverted" {
+						r = strings.NewReplacer("~{", "", "}", "").Replace(r)
+					}
 					nm.Kids[1] = schgen.Q(r)
 				}
 				// выводы питания на ГОСТ-УГО без имён — только номера (иначе налезают на основное поле)
@@ -137,8 +169,48 @@ func gostifyGate(sym *schgen.Node, g gostGate) {
 			pin.Find("length").Kids[1] = schgen.F(pl)
 			if g.invOut && pin.Arg(0) == "output" {
 				pin.Kids[2] = schgen.A("inverted")
+				// вывод длиннее: номер вывода не ложится на кружок инверсии (проверка листов 09.10.2026)
+				at := pin.Find("at")
+				at.Kids[1] = schgen.F(at.Num(0) + 1.27)
+				pin.Find("length").Kids[1] = schgen.F(pl + 1.27)
 			}
 		}
-		sub.Kids = append(sub.Kids, rectN(-5.08, 5.08, 5.08, -5.08), textN(g.title, 0, 3.175, 2))
+		// обозначение функции — в правом верхнем углу основного поля (замечание Гольцова: «единичка справа вверху, а не по центру»)
+		sub.Kids = append(sub.Kids, rectN(-5.08, 5.08, 5.08, -5.08), textN(g.title, 3.302, 3.302, 2))
 	}
+}
+
+func mcuNames() map[string]string {
+	m := map[string]string{"~{EA}/VPP": "~{EA}", "P1.7/SCK": "P1.7", "P1.5/MOSI": "P1.5", "P1.6/MISO": "P1.6"}
+	for i := 0; i < 8; i++ {
+		m[fmt.Sprintf("P0.%d/AD%d", i, i)] = fmt.Sprintf("AD%d", i)
+		m[fmt.Sprintf("P2.%d/A%d", i, 8+i)] = fmt.Sprintf("A%d", 8+i)
+	}
+	return m
+}
+
+// idtNames — имена выводов IDT7005 без суффикса порта: CEL → CE, I/O0R → I/O0, A12L → A12, BUSYR → BUSY.
+func idtNames() map[string]string {
+	m := map[string]string{}
+	for _, side := range []string{"L", "R"} {
+		for _, n := range []string{"CE", "OE", "R/W", "BUSY", "SEM", "INT"} {
+			m["~{"+n+side+"}"] = "~{" + n + "}"
+			m[n+side] = n
+		}
+		// частичное надчёркивание (W, S) на листе ложится под имя вывода строкой выше и читается как его подчёркивание
+		// («OE_», «INT_» — проверка листов 09.10.2026): R/W и M/S — как в таблице выводов даташита, смысл уровней — в ПЗ1
+		m["R/~{W"+side+"}"] = "R/W"
+		m["R/~{W}"+side] = "R/W"
+		for _, n := range []string{"CE", "OE", "BUSY", "SEM", "INT"} {
+			m["~{"+n+"}"+side] = "~{" + n + "}"
+		}
+		for i := 0; i <= 12; i++ {
+			m[fmt.Sprintf("A%d%s", i, side)] = fmt.Sprintf("A%d", i)
+		}
+		for i := 0; i < 8; i++ {
+			m[fmt.Sprintf("I/O%d%s", i, side)] = fmt.Sprintf("I/O%d", i)
+		}
+	}
+	m["M/~{S}"] = "M/S"
+	return m
 }

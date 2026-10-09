@@ -11,7 +11,9 @@ import (
 //
 // Отводы к шине во всех стилях — Т-образно, 90° (Sheet.SetPerpEntries).
 //
-//	A — как принятая схема Рязанцева (2025): американские вентили, «Сигнал | Вывод», рамка с боковыми графами;
+//	Вентили во всех стилях — по ГОСТ 2.743 (замечание Гольцова 08.10.2026: американские «не по ЕСКД»).
+//
+//	A — как принятая схема Рязанцева (2025), но с ГОСТ-вентилями: «Сигнал | Вывод», рамка с боковыми графами;
 //	B — как принятая схема Осиповой (2025): ГОСТ-вентили, шина BUS1, «№ | Цепь», только штамп;
 //	C — как Сорокина (2023): ГОСТ-вентили и микросхемы с полями, отводы 90°, один XS1 из частей XS1.1–1.3 «Конт. | Цепь», только штамп;
 //	D — как Базарнов (2023): ГОСТ-вентили и микросхемы, отводы 90°, шины B1…B5, отдельные XS «Конт. | Цепь», рамка с боковыми графами.
@@ -28,9 +30,9 @@ type Style struct {
 }
 
 var Styles = map[string]Style{
-	"A": {Name: "A", Conn: ConnSignalPin, FullFrame: true},
-	"B": {Name: "B", GostGates: true, MainBus: "BUS1", Conn: ConnNumNet},
-	"C": {Name: "C", GostGates: true, GostICs: true, Perp: true, Conn: ConnContNet, Sections: true},
+	"A": {Name: "A", GostGates: true, GostICs: true, Conn: ConnSignalPin, FullFrame: true},
+	"B": {Name: "B", GostGates: true, GostICs: true, MainBus: "BUS1", Conn: ConnNumNet},
+	"C": {Name: "C", GostGates: true, GostICs: true, Perp: true, Conn: ConnContNet},
 	"D": {Name: "D", GostGates: true, GostICs: true, Perp: true, BusNames: true, Conn: ConnContNet, FullFrame: true},
 }
 
@@ -50,8 +52,10 @@ func MixStyle(seed string) Style {
 	h := fnv.New64a()
 	h.Write([]byte("style|" + seed))
 	r := rand.New(rand.NewSource(int64(h.Sum64())))
-	s := Style{Name: "авто", GostGates: r.Intn(2) == 1, GostICs: r.Intn(2) == 1, Perp: r.Intn(2) == 1,
-		Conn: []ConnStyle{ConnSignalPin, ConnNumNet, ConnContNet}[r.Intn(3)], Sections: r.Intn(2) == 1, FullFrame: r.Intn(2) == 1}
+	_ = r.Intn(2) // бывший выбор вентилей: оставлен, чтобы не сдвигать остальные признаки
+	_ = r.Intn(2) // бывший выбор вида микросхем: оставлен, чтобы не сдвигать остальные признаки
+	s := Style{Name: "авто", GostGates: true, GostICs: true, Perp: r.Intn(2) == 1,
+		Conn: []ConnStyle{ConnSignalPin, ConnNumNet, ConnContNet}[r.Intn(3)], Sections: r.Intn(2) < 0, FullFrame: r.Intn(2) == 1} // Sections (r.Intn — чтобы не сдвинуть остальные признаки) не включаем: один XS из частей нарушает ТЗ 2.1 п. 9 «отдельный разъём для доступа к буферу»
 	switch r.Intn(3) {
 	case 1:
 		s.MainBus = "BUS1"

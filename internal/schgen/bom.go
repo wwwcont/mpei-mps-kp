@@ -13,7 +13,7 @@ type BOMLine struct {
 	Qty                     int
 }
 
-// Наименования — по образцу принятого ПЭ3 (Осипова, 2025) и ТЗ-2026 «В работе применять…».
+// Наименования — тип без видового слова (вид — заголовок группы или «Примечание»; замечание Гольцова: «розетка — в графу примечание»), по образцу принятого ПЭ3 (Осипова, 2025) и ТЗ-2026 «В работе применять…».
 var bomGroups = map[string]string{
 	"C": "Конденсаторы", "DD": "Микросхемы", "HG": "Индикаторы", "R": "Резисторы",
 	"SB": "Кнопки", "VD": "Диоды", "XS": "Разъёмы", "ZQ": "Резонаторы",
@@ -44,7 +44,7 @@ func bomName(c *Comp, contacts int) (name, note string) {
 	case "74HC173":
 		return c.Value, "Регистр 4-разрядный"
 	case "74HC244":
-		return "IN74AC244", "Повторитель с тремя состояниями"
+		return "IN74AC244", "Буферный формирователь" // короче: в графу «Примечание» помещается в одну строку
 	case "74HC02":
 		return c.Value, "4 элемента 2ИЛИ-НЕ"
 	case "74HC32":
@@ -56,26 +56,27 @@ func bomName(c *Comp, contacts int) (name, note string) {
 	case "74HC138":
 		return c.Value, "Дешифратор 3 на 8"
 	case "IDT7005":
-		return "IDT7005S55PF", "Двухпортовое ОЗУ 8Кx8"
+		return "IDT7005S55PF", "Двухпортовое ОЗУ 8К×8"
 	case "FYS-5612AX":
-		return "Индикатор FYS-5612AX", "Общий катод"
+		return "FYS-5612AX", "Индикатор, общий катод"
 	case "FYS-5612BX":
-		return "Индикатор FYS-5612BX", "Общий анод"
+		return "FYS-5612BX", "Индикатор, общий анод"
 	case "SW_Push":
-		return "Кнопка DTSM-62N-V", ""
+		return "DTSM-62N-V", ""
 	case "D":
-		return "Диод КД521А", ""
+		return "КД521А", ""
 	case "Crystal":
-		return "Резонатор кварцевый HC-49S 12 МГц", ""
+		return "HC-49S 12 МГц", "Кварцевый"
 	case "R":
 		return "МЛТ-0,125 " + withUnit("R", c.Value) + " ±5 %", ""
 	case "C_Polarized":
-		return "К50-35 16 В " + withUnit("C", c.Value), ""
+		return "К50-35 " + withUnit("C", c.Value) + " ±20 % 16 В", ""
 	case "C":
-		return "К10-17Б " + withUnit("C", c.Value) + " ±10 %", ""
+		return "К10-17Б " + withUnit("C", c.Value) + " ±10 % 50 В", ""
 	}
 	if strings.HasPrefix(sym, "CONN_") {
-		return fmt.Sprintf("Розетка PBS-%d", contacts), fmt.Sprintf("%d конт.", contacts)
+		// «Розетка» — в примечание, не в наименование (замечание Гольцова 08.10.2026)
+		return fmt.Sprintf("PBS-%d", contacts), fmt.Sprintf("Розетка, %d конт.", contacts)
 	}
 	return c.Value, ""
 }
