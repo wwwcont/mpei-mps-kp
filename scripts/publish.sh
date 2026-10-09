@@ -47,7 +47,10 @@ work="$(mktemp -d)"
 git config --global user.name "github-actions[bot]"
 git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-for attempt in 1 2 3; do
+# несколько запусков КМ-1/2/3 сразу (перезапуск всех студентов) пушат в results наперегонки: повторов много, пауза случайная,
+# а если так и не вышло — запуск падает (иначе карточка уходит в Issue, а в results схемы нет: 09.10.2026, Судьбинин СХЕМА-2)
+published=""
+for attempt in $(seq 1 12); do
   rm -rf "$work/r" "$work/idx0" && mkdir -p "$work/r"
   lease=""
   if git fetch -q origin results 2>/dev/null; then
@@ -158,10 +161,11 @@ PY
   c="$(git commit-tree "$t" -m "results: ${GITHUB_RUN_ID:-local} (${GITHUB_SHA:0:7})")"
   args=(--force)
   [ -n "$lease" ] && args=(--force-with-lease="refs/heads/results:$lease")
-  if git push -q "${args[@]}" origin "$c:refs/heads/results"; then break; fi
+  if git push -q "${args[@]}" origin "$c:refs/heads/results"; then published=1; break; fi
   echo "results: гонка с другим запуском, повтор $attempt" >&2
-  sleep 5
+  sleep $((3 + RANDOM % 13))
 done
+[ -n "$published" ] || { echo "::error::results: не удалось опубликовать за 12 попыток — перезапусти джобу" >&2; exit 1; }
 
 [ "${SUMMARY:-1}" = "0" ] && exit 0
 # сводка на странице запуска; картинка — по коммиту, а не по ветке (raw-CDN кэширует ветку минутами)
