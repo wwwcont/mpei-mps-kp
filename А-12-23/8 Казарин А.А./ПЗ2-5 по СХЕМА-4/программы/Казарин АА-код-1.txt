@@ -1,0 +1,162 @@
+; Казарин А.А., А-12-23, 8, v1
+; ---- vars.inc (вклеен mpscode) ----
+; Параметры варианта А-12, M=8 (ТЗ 2026). Сгенерировано mpsgen — не править руками.
+
+VAR_M        EQU 8            ; номер варианта
+VAR_G        EQU 12            ; номер группы
+Y2_CONST     EQU 20            ; G+M: Y2 = (Y2_CONST + X1 + X2) mod 256
+
+; --- адреса внешних устройств (movx) ---
+ADR_IND      EQU 0E000h        ; индикатор, CS Y7
+ADR_KB       EQU 2000h        ; клавиатура: запись столбцов / чтение строк, CS Y1
+ADR_Y2       EQU 0C000h        ; регистр Y2, CS Y6
+BUF_START    EQU 0A000h        ; первая ячейка буфера, CS Y5
+BUF_END      EQU 0A694h        ; первая ячейка ЗА буфером (точка заворота)
+BUF_SIZE     EQU 1684
+BUF_X2IN     EQU 0BFFFh        ; ячейка обмена: сюда внешнее устройство пишет X2 правым портом (строб X2 = прерывание INT1)
+
+; --- клавиатура 4x3 и индикатор ---
+KB_COLS      EQU 4             ; столбцы Col1…Col4 — биты D0…D3 при записи в ADR_KB (0 — столбец опрашивается)
+KB_ROWS      EQU 3             ; строки Row1…Row3 — биты D0…D2 при чтении ADR_KB (0 — замкнута); старшие биты не определены — маскировать
+IND_OFF      EQU 0FFh           ; индикатор погашен (общий анод: 0 зажигает сегмент; D0…D7 = a…g, dp)
+
+; --- внутреннее ОЗУ ---
+HEAD_L       EQU 47h          ; «голова», младший байт
+HEAD_H       EQU 48h          ; «голова», старший байт
+TAIL_L       EQU 49h          ; «хвост», младший байт
+TAIL_H       EQU 4Ah          ; «хвост», старший байт
+F_EMPTY      BIT 8h          ; флаг пустоты буфера (21h.0)
+F_OVF        BIT 14h          ; флаг переполнения буфера (22h.4)
+
+; --- выводы ---
+PIN_Y1       BIT P1.1         ; строб Y1, активный 0
+PIN_Y2       BIT P1.2         ; строб Y2, активный 0
+PIN_CSEN     BIT P3.4         ; CS_EN: разрешение дешифратора CS (1 — CS активны)
+
+; --- таймеры (кварц 12 МГц) ---
+T2_RELOAD_H  EQU 0F7h          ; строб Y2 2152 мкс, Timer1
+T2_RELOAD_L  EQU 98h
+TICK_H       EQU 0FCh          ; тик 1 мс для Y1/T3, Timer0
+TICK_L       EQU 18h
+Y1_TICKS     EQU 271           ; T1 = 271 мс
+T3_TICKS     EQU 2740          ; T3 = 2740 мс
+; ---- конец vars.inc ----
+DSEG AT 30h
+KCOL:   DS 1                    ; текущий столбец 0…3
+KROWS:  DS 1                    ; маска нажатых строк
+KROWNO: DS 1                    ; номер строки для таблицы кодов
+KCOUNT: DS 1                    ; число найденных клавиш
+KCODE:  DS 1                    ; код единственной клавиши
+CSEG AT 0h
+        sjmp START
+org 03h                         ; INT0 — нажатие клавиши: процедура вызывается отсюда
+        call KbScan ; %proc%
+        reti
+org 0bh ; "заглушка" для Tmr0_ovf
+        nop
+        reti
+org 13h ; "заглушка" для INT1
+        nop
+        reti
+org 1bh ; "заглушка" для Tmr1_ovf
+        nop
+        reti
+org 23h ; "заглушка" для UART
+        nop
+        reti
+org 2bh
+START:
+; Инициализация МК **********************************************
+        mov SP, #07h
+        setb PIN_CSEN              ; включить дешифратор адресов
+        mov DPTR, #ADR_KB          ; подготовить регистр столбцов
+        clr A
+        movx @DPTR, A              ; все столбцы активны для INT0
+        setb IT0                   ; прерывание INT0 по спаду
+        setb EX0                   ; разрешить клавиатурное прерывание
+        setb EA                    ; разрешить глобальные прерывания
+        jmp $ ; %stop%
+
+; KbScan — сканирование матрицы клавиатуры по столбцам (обработчик INT0).
+; Вход: нет. Выход: A — код единственной нажатой клавиши по табл. 3 ТЗ или 0FFh.
+; Портит: A, DPTR, флаги PSW и временные переменные в DSEG.
+KbScan:
+        push PSW                  ; сохранить рабочие флаги и адрес данных
+        push DPL
+        push DPH
+        mov KCOUNT, #0             ; начать подсчёт нажатий
+        mov KCODE, #0FFh           ; значение на случай неоднозначного ввода
+        mov KCOL, #0               ; начать с первого столбца
+KbColumn:
+        mov A, KCOL
+        mov DPTR, #ColMask         ; выбрать маску столбца
+        movc A, @A+DPTR
+        mov DPTR, #ADR_KB
+        movx @DPTR, A              ; опустить только выбранный столбец
+        movx A, @DPTR              ; прочитать строки матрицы
+        anl A, #((1 SHL KB_ROWS) - 1)
+        cpl A
+        anl A, #((1 SHL KB_ROWS) - 1)
+        mov KROWS, A
+
+        mov A, KROWS
+        jnb ACC.0, KRow2           ; строка 1 замкнулась на столбец?
+        mov KROWNO, #0
+        call RecordKey
+KRow2:
+        mov A, KROWS
+        jnb ACC.1, KRow3           ; строка 2 замкнулась на столбец?
+        mov KROWNO, #1
+        call RecordKey
+KRow3:
+        mov A, KROWS
+        jnb ACC.2, KNextColumn     ; строка 3 замкнулась на столбец?
+        mov KROWNO, #2
+        call RecordKey
+KNextColumn:
+        inc KCOL                   ; перейти к следующему столбцу
+        mov A, KCOL
+        cjne A, #KB_COLS, KbColumn
+
+        mov DPTR, #ADR_KB
+        clr A
+        movx @DPTR, A              ; вернуть матрицу в режим ожидания
+        clr IE0                    ; убрать спады INT0 во время сканирования
+        mov A, KCOUNT
+        cjne A, #1, KbInvalid      ; принимать только одно нажатие
+        mov A, KCODE
+        pop DPH                    ; восстановить регистры, не меняя код в A
+        pop DPL
+        pop PSW
+        ret
+KbInvalid:
+        mov A, #0FFh
+        pop DPH                    ; восстановить регистры, не меняя код в A
+        pop DPL
+        pop PSW
+        ret
+
+; RecordKey — учесть одну найденную замкнутую точку матрицы.
+; Вход: KCOL и KROWNO. Выход: KCOUNT увеличен; KCODE задан для первой клавиши.
+; Портит: A, DPTR, флаги PSW.
+RecordKey:
+        inc KCOUNT                 ; каждое замыкание — отдельное нажатие
+        mov A, KCOUNT
+        cjne A, #1, RecordDone     ; код сохраняется только для первой клавиши
+        mov A, KCOL
+        rl A
+        add A, KCOL                ; индекс столбца умножен на число строк
+        add A, KROWNO
+        mov DPTR, #KeyMap
+        movc A, @A+DPTR            ; получить код клавиши по таблице раскладки
+        mov KCODE, A
+RecordDone:
+        ret
+
+; ColMask: при опросе один столбец имеет ноль, остальные — единицы.
+ColMask:
+        db 0FEh, 0FDh, 0FBh, 0F7h
+; KeyMap расположена столбцами: 1/4/7, 2/5/8, 3/6/9, Т/С/0.
+KeyMap:
+        db 1, 4, 7, 2, 5, 8, 3, 6, 9, 10, 11, 0
+END

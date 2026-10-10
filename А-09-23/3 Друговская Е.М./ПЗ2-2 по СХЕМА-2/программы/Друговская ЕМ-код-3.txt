@@ -1,0 +1,145 @@
+; Друговская Е.М., А-09-23, 3, v1
+; ---- vars.inc (вклеен mpscode) ----
+; Параметры варианта А-09, M=3 (ТЗ 2026). Сгенерировано mpsgen — не править руками.
+
+VAR_M        EQU 3            ; номер варианта
+VAR_G        EQU 9            ; номер группы
+Y2_CONST     EQU 12            ; G+M: Y2 = (Y2_CONST + X1 + X2) mod 256
+
+; --- адреса внешних устройств (movx) ---
+ADR_IND      EQU 0A000h        ; индикатор, CS Y5
+ADR_KB       EQU 0E000h        ; клавиатура: запись столбцов / чтение строк, CS Y7
+ADR_Y2       EQU 0C000h        ; регистр Y2, CS Y6
+BUF_START    EQU 8000h        ; первая ячейка буфера, CS Y4
+BUF_END      EQU 85FAh        ; первая ячейка ЗА буфером (точка заворота)
+BUF_SIZE     EQU 1530
+BUF_X2IN     EQU 9FFFh        ; ячейка обмена: сюда внешнее устройство пишет X2 правым портом (строб X2 = прерывание INT1)
+
+; --- клавиатура 3x4 и индикатор ---
+KB_COLS      EQU 3             ; столбцы Col1…Col3 — биты D0…D2 при записи в ADR_KB (0 — столбец опрашивается)
+KB_ROWS      EQU 4             ; строки Row1…Row4 — биты D0…D3 при чтении ADR_KB (0 — замкнута); старшие биты не определены — маскировать
+IND_OFF      EQU 0FFh           ; индикатор погашен (общий анод: 0 зажигает сегмент; D0…D7 = a…g, dp)
+
+; --- внутреннее ОЗУ ---
+HEAD_L       EQU 44h          ; «голова», младший байт
+HEAD_H       EQU 45h          ; «голова», старший байт
+TAIL_L       EQU 46h          ; «хвост», младший байт
+TAIL_H       EQU 47h          ; «хвост», старший байт
+F_EMPTY      BIT 3h          ; флаг пустоты буфера (20h.3)
+F_OVF        BIT 0Ch          ; флаг переполнения буфера (21h.4)
+
+; --- выводы ---
+PIN_Y1       BIT P1.3         ; строб Y1, активный 0
+PIN_Y2       BIT P1.4         ; строб Y2, активный 0
+PIN_CSEN     BIT P3.4         ; CS_EN: разрешение дешифратора CS (1 — CS активны)
+
+; --- таймеры (кварц 12 МГц) ---
+T2_RELOAD_H  EQU 0F8h          ; строб Y2 1899 мкс, Timer1
+T2_RELOAD_L  EQU 95h
+TICK_H       EQU 0ECh          ; тик 5 мс для Y1/T3, Timer0
+TICK_L       EQU 78h
+Y1_TICKS     EQU 43           ; T1 = 215 мс
+T3_TICKS     EQU 486          ; T3 = 2430 мс
+; ---- конец vars.inc ----
+T0_LOAD EQU (TICK_H SHL 8) + TICK_L + 7   ; загрузка тика 5 мс + 7 циклов, пока таймер стоит в обработчике
+DSEG AT 30h
+T3Cnt:  DS 2                    ; сколько тиков по 5 мс осталось до гашения (младший, старший байт)
+CSEG AT 0h
+        sjmp START
+org 03h ; "заглушка" для INT0
+        nop
+        reti
+org 0bh                         ; Timer0 — тик для отсчёта T3
+        ljmp T0Isr
+org 13h ; "заглушка" для INT1
+        nop
+        reti
+org 1bh ; "заглушка" для Tmr1_ovf
+        nop
+        reti
+org 23h ; "заглушка" для UART
+        nop
+        reti
+org 2bh
+START:
+; Инициализация МК **********************************************
+        mov SP, #07h
+        setb PIN_CSEN           ; дешифратор включён — регистр индикатора доступен
+        mov DPTR, #ADR_IND
+        mov A, #IND_OFF
+        movx @DPTR, A           ; после сброса индикатор тёмный
+        mov TMOD, #11h          ; оба таймера — 16-разрядные (режим 1)
+        setb ET0                ; прерывание Timer0 — отсчёт T3
+        setb EA
+        mov A, #5               ; пример: показать «5»
+        call Show ; %proc%
+        jmp $ ; %stop%
+
+; Show — вывод символа на индикатор (общий анод) на время T3; гасит его обработчик Timer0.
+; Вход: A — код по табл. 2 ТЗ: 0–9 — цифра, 10 — «E», больше — погасить.
+; Выход: символ в регистре индикатора; для 0–10 заново запущен отсчёт T3.
+; Портит: A, DPTR, PSW.
+Show:
+        cjne A, #11, $+3        ; C = 1, если код меньше 11
+        jnc ShBlank             ; 11 и больше — показывать нечего
+        mov DPTR, #SegTab
+        movc A, @A+DPTR         ; код символа -> сегменты
+        mov DPTR, #ADR_IND
+        movx @DPTR, A           ; символ загорается
+        clr TR0                 ; старый отсчёт (если шёл) отменяем
+        clr ET0                 ; счётчик меняем без помех от прерывания
+        mov T3Cnt, #LOW(T3_TICKS)
+        mov T3Cnt+1, #HIGH(T3_TICKS)
+        mov TH0, #TICK_H        ; первый тик 5 мс
+        mov TL0, #TICK_L
+        clr TF0
+        setb ET0
+        setb TR0                ; пошёл отсчёт T3
+        ret
+ShBlank:
+        mov A, #IND_OFF
+        mov DPTR, #ADR_IND
+        movx @DPTR, A           ; гасим индикатор сразу
+        clr TR0                 ; отсчёт T3 больше не нужен
+        ret
+
+; T0Isr — тик Timer0 (5 мс): перезагрузка таймера с поправкой, счёт тиков T3,
+; по окончании T3 — индикатор гаснет и таймер останавливается.
+; Вход: T3Cnt. Выход: T3Cnt уменьшен. Портит: ничего (A, PSW, DPTR сохраняются).
+T0Isr:
+        push ACC
+        push PSW
+        clr TR0                 ; на время перезагрузки таймер стоит
+        mov A, TL0              ; TL0/TH0 уже набежали после переполнения — прибавляем к ним
+        add A, #LOW(T0_LOAD)
+        mov TL0, A
+        mov A, TH0
+        addc A, #HIGH(T0_LOAD)
+        mov TH0, A
+        setb TR0
+        mov A, T3Cnt            ; T3Cnt := T3Cnt - 1 (16 бит)
+        jnz T0Low
+        dec T3Cnt+1
+T0Low:
+        dec T3Cnt
+        mov A, T3Cnt
+        orl A, T3Cnt+1
+        jnz T0Exit              ; T3 ещё не кончилось
+        clr TR0                 ; T3 вышло — таймер больше не нужен
+        push DPL
+        push DPH
+        mov DPTR, #ADR_IND
+        mov A, #IND_OFF
+        movx @DPTR, A           ; гасим индикатор
+        pop DPH
+        pop DPL
+T0Exit:
+        pop PSW
+        pop ACC
+        reti
+
+; Сегменты для общего анода (0 — сегмент горит; D0…D7 = a…g, dp): цифры 0–9 и «E».
+SegTab: DB 0C0h, 0F9h, 0A4h, 0B0h, 099h
+        DB 092h, 082h, 0F8h, 080h, 090h
+        DB 086h
+END

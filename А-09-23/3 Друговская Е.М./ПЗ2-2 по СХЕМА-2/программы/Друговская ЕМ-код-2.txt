@@ -1,0 +1,123 @@
+; Друговская Е.М., А-09-23, 3, v1
+; ---- vars.inc (вклеен mpscode) ----
+; Параметры варианта А-09, M=3 (ТЗ 2026). Сгенерировано mpsgen — не править руками.
+
+VAR_M        EQU 3            ; номер варианта
+VAR_G        EQU 9            ; номер группы
+Y2_CONST     EQU 12            ; G+M: Y2 = (Y2_CONST + X1 + X2) mod 256
+
+; --- адреса внешних устройств (movx) ---
+ADR_IND      EQU 0A000h        ; индикатор, CS Y5
+ADR_KB       EQU 0E000h        ; клавиатура: запись столбцов / чтение строк, CS Y7
+ADR_Y2       EQU 0C000h        ; регистр Y2, CS Y6
+BUF_START    EQU 8000h        ; первая ячейка буфера, CS Y4
+BUF_END      EQU 85FAh        ; первая ячейка ЗА буфером (точка заворота)
+BUF_SIZE     EQU 1530
+BUF_X2IN     EQU 9FFFh        ; ячейка обмена: сюда внешнее устройство пишет X2 правым портом (строб X2 = прерывание INT1)
+
+; --- клавиатура 3x4 и индикатор ---
+KB_COLS      EQU 3             ; столбцы Col1…Col3 — биты D0…D2 при записи в ADR_KB (0 — столбец опрашивается)
+KB_ROWS      EQU 4             ; строки Row1…Row4 — биты D0…D3 при чтении ADR_KB (0 — замкнута); старшие биты не определены — маскировать
+IND_OFF      EQU 0FFh           ; индикатор погашен (общий анод: 0 зажигает сегмент; D0…D7 = a…g, dp)
+
+; --- внутреннее ОЗУ ---
+HEAD_L       EQU 44h          ; «голова», младший байт
+HEAD_H       EQU 45h          ; «голова», старший байт
+TAIL_L       EQU 46h          ; «хвост», младший байт
+TAIL_H       EQU 47h          ; «хвост», старший байт
+F_EMPTY      BIT 3h          ; флаг пустоты буфера (20h.3)
+F_OVF        BIT 0Ch          ; флаг переполнения буфера (21h.4)
+
+; --- выводы ---
+PIN_Y1       BIT P1.3         ; строб Y1, активный 0
+PIN_Y2       BIT P1.4         ; строб Y2, активный 0
+PIN_CSEN     BIT P3.4         ; CS_EN: разрешение дешифратора CS (1 — CS активны)
+
+; --- таймеры (кварц 12 МГц) ---
+T2_RELOAD_H  EQU 0F8h          ; строб Y2 1899 мкс, Timer1
+T2_RELOAD_L  EQU 95h
+TICK_H       EQU 0ECh          ; тик 5 мс для Y1/T3, Timer0
+TICK_L       EQU 78h
+Y1_TICKS     EQU 43           ; T1 = 215 мс
+T3_TICKS     EQU 486          ; T3 = 2430 мс
+; ---- конец vars.inc ----
+DSEG AT 30h
+; переменные не нужны: указатели и флаги буфера заданы в vars.inc
+CSEG AT 0h
+        sjmp START
+org 03h ; "заглушка" для INT0
+        nop
+        reti
+org 0bh ; "заглушка" для Tmr0_ovf
+        nop
+        reti
+org 13h ; "заглушка" для INT1
+        nop
+        reti
+org 1bh ; "заглушка" для Tmr1_ovf
+        nop
+        reti
+org 23h ; "заглушка" для UART
+        nop
+        reti
+org 2bh
+START:
+; Инициализация МК **********************************************
+        mov SP, #07h
+        setb PIN_CSEN           ; дешифратор включён — буфер доступен по movx
+        mov HEAD_L, #LOW(BUF_START)   ; писать будем с первой ячейки кольца
+        mov HEAD_H, #HIGH(BUF_START)
+        mov TAIL_L, #LOW(BUF_START)   ; читать — тоже с первой: голова = хвост
+        mov TAIL_H, #HIGH(BUF_START)
+        setb F_EMPTY            ; отсчётов в буфере нет
+        clr F_OVF               ; ничего не потеряно
+        mov A, #55h             ; пример отсчёта
+        call BufWrite ; %proc%
+        jmp $ ; %stop%
+
+; BufWrite — запись отсчёта в кольцевой буфер в ячейку «головы».
+; Если буфер уже полон (голова догнала хвост, буфер не пуст), самый старый
+; отсчёт теряется: хвост уходит на следующую ячейку, F_OVF = 1.
+; Вход: A — отсчёт.
+; Выход: отсчёт в буфере, голова сдвинута, F_EMPTY = 0; F_OVF = 1 при затирании.
+; Портит: DPTR, PSW (A сохраняется).
+BufWrite:
+        push ACC                ; отсчёт понадобится после проверок
+        jb F_EMPTY, BwPut       ; пустой буфер полным быть не может
+        mov A, HEAD_L
+        cjne A, TAIL_L, BwPut   ; голова не на хвосте — место есть
+        mov A, HEAD_H
+        cjne A, TAIL_H, BwPut
+        mov DPL, TAIL_L         ; буфер полон: выбрасываем самый старый отсчёт
+        mov DPH, TAIL_H
+        call PtrStep
+        mov TAIL_L, DPL
+        mov TAIL_H, DPH
+        setb F_OVF              ; отмечаем, что отсчёт потерян
+BwPut:
+        mov DPL, HEAD_L         ; адрес ячейки «головы»
+        mov DPH, HEAD_H
+        pop ACC
+        movx @DPTR, A           ; кладём отсчёт левым портом IDT7005
+        call PtrStep
+        mov HEAD_L, DPL         ; голова — на следующую свободную ячейку
+        mov HEAD_H, DPH
+        clr F_EMPTY             ; теперь в буфере точно что-то есть
+        ret
+
+; PtrStep — переход указателя буфера на следующую ячейку кольца.
+; Вход: DPTR — адрес ячейки буфера.
+; Выход: DPTR — следующая ячейка; после последней (BUF_END - 1) — BUF_START.
+; Портит: PSW (A сохраняется).
+PtrStep:
+        push ACC
+        inc DPTR
+        mov A, DPL
+        cjne A, #LOW(BUF_END), PsDone   ; не дошли до конца кольца
+        mov A, DPH
+        cjne A, #HIGH(BUF_END), PsDone
+        mov DPTR, #BUF_START    ; вышли за последнюю ячейку — заворачиваем на начало
+PsDone:
+        pop ACC
+        ret
+END

@@ -1,0 +1,93 @@
+{
+  "year": 2026,
+  "group": "А-09",
+  "m": 2,
+  "k": 2,
+  "student": "Давыдова Е.П.",
+  "checker": "Ключанский А.А.",
+  "g": 9,
+  "cs_mode": "decoder",
+  "cs_en_pin": "P3.4",
+  "x2_rate": 4,
+  "filter_cap": "33 н",
+  "keyboard": "4x3",
+  "cols": 4,
+  "rows": 3,
+  "indicator": "anode",
+  "Y1Pin": "P1.2",
+  "Y2Pin": "P1.3",
+  "KbInt": "INT0",
+  "X2Int": "INT1",
+  "KbIntPin": "P3.2",
+  "X2IntPin": "P3.3",
+  "T1ms": 205,
+  "T2us": 1869,
+  "T3ms": 2380,
+  "V": 1520,
+  "Y1Timer": 0,
+  "Y2Timer": 1,
+  "T3Timer": 0,
+  "T2Reload": 63667,
+  "Y1": {
+    "ms": 205,
+    "tick_ms": 5,
+    "ticks": 41,
+    "reload": 60536,
+    "counter_bits": 8
+  },
+  "T3": {
+    "ms": 2380,
+    "tick_ms": 5,
+    "ticks": 476,
+    "reload": 60536,
+    "counter_bits": 16
+  },
+  "Head": 68,
+  "Tail": 70,
+  "Empty": {
+    "addr": 2,
+    "byte": 32,
+    "pos": 2,
+    "asm": "20h.2"
+  },
+  "Ovf": {
+    "addr": 11,
+    "byte": 33,
+    "pos": 3,
+    "asm": "21h.3"
+  },
+  "Devices": [
+    {
+      "name": "Индикатор",
+      "cs": "Y6",
+      "base": 49152,
+      "win_size": 8192
+    },
+    {
+      "name": "Клавиатура",
+      "cs": "Y7",
+      "base": 57344,
+      "win_size": 8192
+    },
+    {
+      "name": "Буфер (IDT7005)",
+      "cs": "Y4",
+      "base": 32768,
+      "win_size": 8192
+    },
+    {
+      "name": "Регистр Y2",
+      "cs": "Y5",
+      "base": 40960,
+      "win_size": 8192
+    }
+  ],
+  "Prog2": "чтение из кольцевого буфера",
+  "Prog3": "расчёт Y2 = (9+2+X1+X2) mod 256, запись в регистр, строб T2 (таймер)",
+  "FillTimeS": 380,
+  "CycleUs": 1,
+  "UnusedCS": "Y0, Y1, Y2, Y3",
+  "Warnings": null,
+  "CrystalMHz": 12,
+  "MinFillNote": ""
+}

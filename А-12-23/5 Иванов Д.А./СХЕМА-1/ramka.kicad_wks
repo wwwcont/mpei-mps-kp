@@ -1,0 +1,496 @@
+(kicad_wks
+	(version 20231118)
+	(generator "pl_editor")
+	(generator_version "9.0")
+	(setup
+		(textsize 3.5 3.5)
+		(linewidth 0.2)
+		(textlinewidth 0.2)
+		(left_margin 10)
+		(right_margin 10)
+		(top_margin 10)
+		(bottom_margin 10)
+	)
+	(rect
+		(name "")
+		(start 389.989 282.0022)
+		(end -5.011 -4.9978)
+	)
+	(rect
+		(name "")
+		(start -5.011 -4.998)
+		(end 179.989 50.002)
+	)
+	(rect
+		(name "")
+		(start 179.989 50.0022)
+		(end 114.989 -4.9978)
+	)
+	(rect
+		(name "")
+		(start 124.989 -4.9978)
+		(end 139.989 50.0022)
+	)
+	(rect
+		(name "")
+		(start 139.989 50.0022)
+		(end 162.989 -4.9978)
+	)
+	(rect
+		(name "")
+		(start 179.989 50.0022)
+		(end 114.989 45.0022)
+	)
+	(rect
+		(name "")
+		(start 179.989 -4.9978)
+		(end 114.989 0.0022)
+	)
+	(rect
+		(name "")
+		(start 179.989 45.0022)
+		(end 114.989 40.0022)
+	)
+	(rect
+		(name "")
+		(start 114.989 0.0022)
+		(end 179.989 5.0022)
+	)
+	(rect
+		(name "")
+		(start 179.989 40.0022)
+		(end 114.989 35.0022)
+	)
+	(rect
+		(name "")
+		(start 114.989 5.0022)
+		(end 179.989 10.0022)
+	)
+	(rect
+		(name "")
+		(start 179.989 35.0022)
+		(end 114.989 30.0022)
+	)
+	(rect
+		(name "")
+		(start -5.011 -4.998)
+		(end 179.989 50.002)
+	)
+	(rect
+		(name "")
+		(start 179.989 30.0022)
+		(end 114.989 25.0022)
+	)
+	(rect
+		(name "")
+		(start 114.989 15.0022)
+		(end 179.989 20.0022)
+	)
+	(rect
+		(name "")
+		(start 162.989 50.0022)
+		(end 172.989 50.0022)
+	)
+	(rect
+		(name "")
+		(start 162.989 50.0022)
+		(end 172.989 25.0022)
+	)
+	(rect
+		(name "")
+		(start 114.989 50.0022)
+		(end -5.011 35.0022)
+	)
+	(rect
+		(name "")
+		(start 114.989 -4.9978)
+		(end 44.989 10.0022)
+	)
+	(rect
+		(name "")
+		(start 44.989 10.0022)
+		(end 114.989 35.0022)
+	)
+	(rect
+		(name "")
+		(start 44.989 10.0022)
+		(end -5.011 -4.9978)
+	)
+	(rect
+		(name "")
+		(start -5.011 10.0022)
+		(end 24.989 15.0022)
+	)
+	(rect
+		(name "")
+		(start 44.989 10.0022)
+		(end 24.989 15.0022)
+	)
+	(rect
+		(name "")
+		(start -5.011 35.0022)
+		(end 12.989 30.0022)
+	)
+	(rect
+		(name "")
+		(start 12.989 30.0022)
+		(end 29.989 35.0022)
+	)
+	(rect
+		(name "")
+		(start 29.989 30.0022)
+		(end 44.989 35.0022)
+	)
+	(rect
+		(name "")
+		(start 12.989 30.0022)
+		(end -5.011 15.0022)
+	)
+	(rect
+		(name "")
+		(start 29.989 30.0022)
+		(end 12.989 15.0022)
+	)
+	(rect
+		(name "")
+		(start 44.989 30.0022)
+		(end 39.989 15.0022)
+	)
+	(rect
+		(name "")
+		(start 29.989 30.0022)
+		(end 34.989 15.0022)
+	)
+	(tbtext "Лист"
+		(name "")
+		(pos 171.989 27.0022)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "N докум."
+		(name "")
+		(pos 157.989 27.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Подп."
+		(name "")
+		(pos 136.989 27.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Дата"
+		(name "")
+		(pos 124.989 27.0022)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Изм."
+		(name "")
+		(pos 179.989 27.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Разраб."
+		(name "")
+		(pos 178.989 22.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Пров."
+		(name "")
+		(pos 178.989 17.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Т. контр."
+		(name "")
+		(pos 178.989 12.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Н. контр."
+		(name "")
+		(pos 178.989 2.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Утв."
+		(name "")
+		(pos 175.989 -2.9978)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Лист ${#}"
+		(name "")
+		(pos 41 12)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Лит."
+		(name "")
+		(pos 40.989 32.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Масса"
+		(name "")
+		(pos 25.989 32.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Масштаб"
+		(name "")
+		(pos 10.989 32.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "Листов ${##}"
+		(name "")
+		(pos 19.989 12.002)
+		(font
+			(face "GOST type A")
+		)
+	)
+	(tbtext "${COMMENT2}"
+		(name "")
+		(pos 161.989 22.002)
+		(font
+			(face "GOST type A")
+		)
+		(maxlen 22)
+		(maxheight 5)
+	)
+	(tbtext "${COMMENT3}"
+		(name "")
+		(pos 161.989 17.002)
+		(font
+			(face "GOST type A")
+		)
+		(maxlen 22)
+		(maxheight 5)
+	)
+	(tbtext "Разработка микропроцессорной"
+		(name "")
+		(pos 110.989 252.002 rtcorner)
+		(font
+			(face "GOST type A") italic)
+	)
+	(tbtext "системы на базе МК i8051"
+		(name "")
+		(pos 110.989 258.002 rtcorner)
+		(font
+			(face "GOST type A") italic)
+	)
+	(tbtext "НИУ «МЭИ»"
+		(name "")
+		(pos 19.989 7.502)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5)
+		)
+		(justify center)
+	)
+	(tbtext "Институт ИВТИ"
+		(name "")
+		(pos 19.989 3.502)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5)
+		)
+		(justify center)
+	)
+	(tbtext "Кафедра ВМСС"
+		(name "")
+		(pos 19.989 -0.498)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5)
+		)
+		(justify center)
+	)
+	(tbtext "${ISSUE_DATE}"
+		(name "")
+		(pos 124.989 22.002)
+		(font
+			(size 1.524 2.5)
+		)
+	)
+	(tbtext "Группа А-12-23, Вариант 5, Э3"
+		(name "")
+		(pos 94.489 234.5 rtcorner)
+		(font
+			(face "GOST type A")
+			(size 5 5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 20)
+		(end 397 -5)
+	)
+	(rect
+		(name "")
+		(start 397 20)
+		(end 390 -5)
+	)
+	(tbtext "Инв. № подл."
+		(name "")
+		(pos 399.5 7.5)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 55)
+		(end 397 20)
+	)
+	(rect
+		(name "")
+		(start 397 55)
+		(end 390 20)
+	)
+	(tbtext "Подп. и дата"
+		(name "")
+		(pos 399.5 37.5)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 80)
+		(end 397 55)
+	)
+	(rect
+		(name "")
+		(start 397 80)
+		(end 390 55)
+	)
+	(tbtext "Взам. инв. №"
+		(name "")
+		(pos 399.5 67.5)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 105)
+		(end 397 80)
+	)
+	(rect
+		(name "")
+		(start 397 105)
+		(end 390 80)
+	)
+	(tbtext "Инв. № дубл."
+		(name "")
+		(pos 399.5 92.5)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 140)
+		(end 397 105)
+	)
+	(rect
+		(name "")
+		(start 397 140)
+		(end 390 105)
+	)
+	(tbtext "Подп. и дата"
+		(name "")
+		(pos 399.5 122.5)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 282)
+		(end 397 222)
+	)
+	(rect
+		(name "")
+		(start 397 282)
+		(end 390 222)
+	)
+	(tbtext "Перв. примен."
+		(name "")
+		(pos 399.5 252.0)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 402 222)
+		(end 397 162)
+	)
+	(rect
+		(name "")
+		(start 397 222)
+		(end 390 162)
+	)
+	(tbtext "Справ. №"
+		(name "")
+		(pos 399.5 192.0)
+		(rotate 90)
+		(font
+			(face "GOST type A")
+			(size 2.5 2.5) italic)
+	)
+	(rect
+		(name "")
+		(start 390 282)
+		(end 320 268)
+	)
+	(tbtext "Группа А-12-23, Вариант 5, Э3"
+		(name "графа 26")
+		(pos 355 275)
+		(rotate 180)
+		(font
+			(face "GOST type A")
+			(size 3.5 3.5) italic)
+		(justify center)
+	)
+	(tbtext "Копировал"
+		(name "")
+		(pos 115 -7.5)
+		(font
+			(face "GOST type A")
+			(size 3.5 3.5) italic)
+		(justify center)
+	)
+	(tbtext "Формат А3"
+		(name "")
+		(pos 40 -7.5)
+		(font
+			(face "GOST type A")
+			(size 3.5 3.5) italic)
+		(justify center)
+	)
+)

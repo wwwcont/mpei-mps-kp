@@ -1,0 +1,93 @@
+{
+  "year": 2026,
+  "group": "А-08",
+  "m": 12,
+  "k": 5,
+  "student": "Лапташкин В.И.",
+  "checker": "Михалин С.Н.",
+  "g": 8,
+  "cs_mode": "decoder",
+  "cs_en_pin": "P3.4",
+  "x2_rate": 4,
+  "filter_cap": "33 н",
+  "keyboard": "4x3",
+  "cols": 4,
+  "rows": 3,
+  "indicator": "anode",
+  "Y1Pin": "P1.5",
+  "Y2Pin": "P1.6",
+  "KbInt": "INT0",
+  "X2Int": "INT1",
+  "KbIntPin": "P3.2",
+  "X2IntPin": "P3.3",
+  "T1ms": 298,
+  "T2us": 2068,
+  "T3ms": 2820,
+  "V": 1528,
+  "Y1Timer": 0,
+  "Y2Timer": 1,
+  "T3Timer": 0,
+  "T2Reload": 63468,
+  "Y1": {
+    "ms": 298,
+    "tick_ms": 2,
+    "ticks": 149,
+    "reload": 63536,
+    "counter_bits": 8
+  },
+  "T3": {
+    "ms": 2820,
+    "tick_ms": 2,
+    "ticks": 1410,
+    "reload": 63536,
+    "counter_bits": 16
+  },
+  "Head": 64,
+  "Tail": 66,
+  "Empty": {
+    "addr": 12,
+    "byte": 33,
+    "pos": 4,
+    "asm": "21h.4"
+  },
+  "Ovf": {
+    "addr": 20,
+    "byte": 34,
+    "pos": 4,
+    "asm": "22h.4"
+  },
+  "Devices": [
+    {
+      "name": "Индикатор",
+      "cs": "Y5",
+      "base": 40960,
+      "win_size": 8192
+    },
+    {
+      "name": "Клавиатура",
+      "cs": "Y6",
+      "base": 49152,
+      "win_size": 8192
+    },
+    {
+      "name": "Буфер (IDT7005)",
+      "cs": "Y3",
+      "base": 24576,
+      "win_size": 8192
+    },
+    {
+      "name": "Регистр Y2",
+      "cs": "Y4",
+      "base": 32768,
+      "win_size": 8192
+    }
+  ],
+  "Prog2": "чтение из кольцевого буфера",
+  "Prog3": "вывод символа на индикатор + гашение по T3 (таймер)",
+  "FillTimeS": 382,
+  "CycleUs": 1,
+  "UnusedCS": "Y0, Y1, Y2, Y7",
+  "Warnings": null,
+  "CrystalMHz": 12,
+  "MinFillNote": ""
+}

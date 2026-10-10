@@ -1,0 +1,132 @@
+; Грошев А.В., А-06-23, 1, v1
+; ---- vars.inc (вклеен mpscode) ----
+; Параметры варианта А-06, M=1 (ТЗ 2026). Сгенерировано mpsgen — не править руками.
+
+VAR_M        EQU 1            ; номер варианта
+VAR_G        EQU 6            ; номер группы
+Y2_CONST     EQU 7            ; G+M: Y2 = (Y2_CONST + X1 + X2) mod 256
+
+; --- адреса внешних устройств (movx) ---
+ADR_IND      EQU 4000h        ; индикатор, CS Y2
+ADR_KB       EQU 8000h        ; клавиатура: запись столбцов / чтение строк, CS Y4
+ADR_Y2       EQU 6000h        ; регистр Y2, CS Y3
+BUF_START    EQU 2000h        ; первая ячейка буфера, CS Y1
+BUF_END      EQU 24BAh        ; первая ячейка ЗА буфером (точка заворота)
+BUF_SIZE     EQU 1210
+BUF_X2IN     EQU 3FFFh        ; ячейка обмена: сюда внешнее устройство пишет X2 правым портом (строб X2 = прерывание INT1)
+
+; --- клавиатура 3x4 и индикатор ---
+KB_COLS      EQU 3             ; столбцы Col1…Col3 — биты D0…D2 при записи в ADR_KB (0 — столбец опрашивается)
+KB_ROWS      EQU 4             ; строки Row1…Row4 — биты D0…D3 при чтении ADR_KB (0 — замкнута); старшие биты не определены — маскировать
+IND_OFF      EQU 00h           ; индикатор погашен (общий катод: 1 зажигает сегмент; D0…D7 = a…g, dp)
+
+; --- внутреннее ОЗУ ---
+HEAD_L       EQU 38h          ; «голова», младший байт
+HEAD_H       EQU 39h          ; «голова», старший байт
+TAIL_L       EQU 3Ah          ; «хвост», младший байт
+TAIL_H       EQU 3Bh          ; «хвост», старший байт
+F_EMPTY      BIT 1h          ; флаг пустоты буфера (20h.1)
+F_OVF        BIT 7h          ; флаг переполнения буфера (20h.7)
+
+; --- выводы ---
+PIN_Y1       BIT P1.1         ; строб Y1, активный 0
+PIN_Y2       BIT P1.2         ; строб Y2, активный 0
+PIN_CSEN     BIT P3.4         ; CS_EN: разрешение дешифратора CS (1 — CS активны)
+
+; --- таймеры (кварц 12 МГц) ---
+T2_RELOAD_H  EQU 0FAh          ; строб Y2 1536 мкс, Timer1
+T2_RELOAD_L  EQU 0h
+TICK_H       EQU 0F8h          ; тик 2 мс для Y1/T3, Timer0
+TICK_L       EQU 30h
+Y1_TICKS     EQU 88           ; T1 = 176 мс
+T3_TICKS     EQU 1075          ; T3 = 2150 мс
+; ---- конец vars.inc ----
+DSEG AT 30h
+; переменные не нужны: «голова», «хвост» и флаги уже заданы в vars.inc
+CSEG AT 0h
+        sjmp START
+org 03h ; "заглушка" для INT0
+        nop
+        reti
+org 0bh ; "заглушка" для Tmr0_ovf
+        nop
+        reti
+org 13h ; "заглушка" для INT1
+        nop
+        reti
+org 1bh ; "заглушка" для Tmr1_ovf
+        nop
+        reti
+org 23h ; "заглушка" для UART
+        nop
+        reti
+org 2bh
+START:
+; Инициализация МК **********************************************
+        mov SP, #07h
+        setb PIN_CSEN           ; дешифратор включён — буфер доступен по movx
+        mov HEAD_L, #LOW(BUF_START)   ; буфер пуст: «голова» и «хвост» на первой ячейке
+        mov HEAD_H, #HIGH(BUF_START)
+        mov TAIL_L, #LOW(BUF_START)
+        mov TAIL_H, #HIGH(BUF_START)
+        setb F_EMPTY            ; данных нет
+        clr F_OVF               ; и ничего не терялось
+        mov A, #55h             ; пробный отсчёт для записи
+        call BufWrite ; %proc%
+        jmp $ ; %stop%
+
+; BufWrite — запись отсчёта в кольцевой буфер IDT7005.
+; Назначение: положить байт в ячейку «головы» и сдвинуть «голову»; если буфер
+;   полон (голова догнала хвост, буфер не пуст), самый старый отсчёт теряется:
+;   «хвост» сдвигается вперёд и ставится флаг переполнения.
+; Вход: A — отсчёт; HEAD, TAIL, F_EMPTY — текущее состояние буфера.
+; Выход: HEAD (и при переполнении TAIL) сдвинуты; F_EMPTY = 0; F_OVF = 1 при потере.
+; Портит: ничего (A, B, DPTR, PSW сохраняются).
+BufWrite:
+        push ACC
+        push B
+        push PSW
+        push DPL
+        push DPH
+        mov B, A                ; отсчёт держим в B, A нужен для сравнений
+        jb F_EMPTY, BwPut       ; пустой буфер полным быть не может
+        mov A, HEAD_L
+        cjne A, TAIL_L, BwPut   ; голова не на хвосте — место есть
+        mov A, HEAD_H
+        cjne A, TAIL_H, BwPut
+        mov DPL, TAIL_L         ; места нет: выбрасываем самый старый отсчёт
+        mov DPH, TAIL_H
+        call NextCell
+        mov TAIL_L, DPL
+        mov TAIL_H, DPH
+        setb F_OVF              ; отмечаем, что данные терялись
+BwPut:
+        mov DPL, HEAD_L
+        mov DPH, HEAD_H
+        mov A, B
+        movx @DPTR, A           ; кладём отсчёт в ячейку «головы»
+        call NextCell
+        mov HEAD_L, DPL         ; «голова» смотрит на следующую свободную ячейку
+        mov HEAD_H, DPH
+        clr F_EMPTY             ; в буфере есть хотя бы один отсчёт
+        pop DPH
+        pop DPL
+        pop PSW
+        pop B
+        pop ACC
+        ret
+
+; NextCell — следующая ячейка кольцевого буфера.
+; Вход: DPTR — адрес ячейки внутри буфера.
+; Выход: DPTR — следующая ячейка; после последней (BUF_END - 1) — снова BUF_START.
+; Портит: A, флаги.
+NextCell:
+        inc DPTR
+        mov A, DPL
+        cjne A, #LOW(BUF_END), NcOut  ; младший байт не совпал — до конца не дошли
+        mov A, DPH
+        cjne A, #HIGH(BUF_END), NcOut
+        mov DPTR, #BUF_START    ; вышли за буфер — заворачиваем на начало
+NcOut:
+        ret
+END
